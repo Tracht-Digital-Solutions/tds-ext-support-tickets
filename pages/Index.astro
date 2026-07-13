@@ -1,11 +1,11 @@
 ---
 // Tickets page, injected into the host build via the manifest's route slot.
-// Checkpoint-1: shell + the list island. The full board (detail view, comment
-// thread, new-ticket form) is built in the next frontend checkpoint.
-import TicketList from "../islands/TicketList.tsx";
+// Renders the portal ticket board (list + detail + comment thread + new-ticket
+// form). Admin triage lives behind /admin/tickets (admin product target).
+import TicketBoard from "../islands/TicketBoard.tsx";
 ---
 
 <section class="page page--tickets">
   <h1>Support-Tickets</h1>
-  <TicketList client:load />
+  <TicketBoard client:load />
 </section>

@@ -1,0 +1,231 @@
+import { useEffect, useState } from "react";
+
+interface TicketRow {
+  id: number;
+  subject: string;
+  status_name: string;
+  status_color: string;
+  priority: string;
+  customer_action_required: number | boolean;
+}
+
+interface Comment {
+  id: number;
+  author_type: "customer" | "owner";
+  body: string;
+  created_at: string;
+}
+
+interface TicketDetail extends TicketRow {
+  description: string;
+  customer_action_note: string | null;
+  comments: Comment[];
+}
+
+const api = (path: string, init?: RequestInit) =>
+  fetch(path, { credentials: "include", ...init });
+
+/**
+ * Portal ticket board (checkpoint-2): the customer's list + detail + comment
+ * thread + new-ticket form. Admin triage lives behind /admin/tickets (admin
+ * product). Uses relative fetches with credentials; the shared api client +
+ * skeletons are wired when the host chrome lands.
+ */
+export default function TicketBoard() {
+  const [tickets, setTickets] = useState<TicketRow[] | null>(null);
+  const [detail, setDetail] = useState<TicketDetail | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const loadList = () =>
+    api("/tickets")
+      .then((r) => (r.ok ? r.json() : { tickets: [] }))
+      .then((d) => setTickets(d.tickets ?? []))
+      .catch(() => setTickets([]));
+
+  useEffect(() => {
+    loadList();
+  }, []);
+
+  const openTicket = (id: number) =>
+    api(`/tickets/${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setDetail(d));
+
+  if (detail) {
+    return (
+      <TicketDetailView
+        ticket={detail}
+        onBack={() => {
+          setDetail(null);
+          loadList();
+        }}
+        onReload={() => openTicket(detail.id)}
+      />
+    );
+  }
+
+  return (
+    <div className="ticket-board">
+      <div className="ticket-board__toolbar">
+        <button type="button" onClick={() => setCreating((v) => !v)}>
+          {creating ? "Abbrechen" : "Neues Ticket"}
+        </button>
+      </div>
+
+      {creating ? (
+        <NewTicketForm
+          onCreated={() => {
+            setCreating(false);
+            loadList();
+          }}
+        />
+      ) : null}
+
+      {tickets === null ? (
+        <p>Wird geladen …</p>
+      ) : tickets.length === 0 ? (
+        <p>Keine Tickets vorhanden.</p>
+      ) : (
+        <ul className="ticket-list">
+          {tickets.map((t) => (
+            <li key={t.id} className="ticket-list__row">
+              <button type="button" className="ticket-list__link" onClick={() => openTicket(t.id)}>
+                {t.subject}
+              </button>
+              <span className={`chip chip--${t.status_color}`}>{t.status_name}</span>
+              {t.customer_action_required ? (
+                <span className="chip chip--warning">Aktion erforderlich</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TicketDetailView({
+  ticket,
+  onBack,
+  onReload,
+}: {
+  ticket: TicketDetail;
+  onBack: () => void;
+  onReload: () => void;
+}) {
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    if (reply.trim() === "") return;
+    setSending(true);
+    await api(`/tickets/${ticket.id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: reply.trim() }),
+    });
+    setReply("");
+    setSending(false);
+    onReload();
+  };
+
+  return (
+    <article className="ticket-detail">
+      <button type="button" onClick={onBack}>
+        ← Zurück
+      </button>
+      <h2>{ticket.subject}</h2>
+      <span className={`chip chip--${ticket.status_color}`}>{ticket.status_name}</span>
+      {ticket.customer_action_required ? (
+        <p className="ticket-detail__action">
+          <strong>Aktion erforderlich:</strong> {ticket.customer_action_note ?? "Bitte antworten Sie."}
+        </p>
+      ) : null}
+      <p className="ticket-detail__description">{ticket.description}</p>
+
+      <ol className="ticket-thread">
+        {ticket.comments.map((c) => (
+          <li key={c.id} className={`ticket-thread__item ticket-thread__item--${c.author_type}`}>
+            <span className="ticket-thread__author">
+              {c.author_type === "owner" ? "Support" : "Sie"}
+            </span>
+            <p>{c.body}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="ticket-reply">
+        <textarea
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          placeholder="Antwort schreiben …"
+          rows={3}
+        />
+        <button type="button" onClick={send} disabled={sending || reply.trim() === ""}>
+          Senden
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function NewTicketForm({ onCreated }: { onCreated: () => void }) {
+  const [subject, setSubject] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("question");
+  const [priority, setPriority] = useState("normal");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (subject.trim() === "" || description.trim() === "") return;
+    setSaving(true);
+    const res = await api("/tickets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, description, type, priority }),
+    });
+    setSaving(false);
+    if (res.ok) onCreated();
+  };
+
+  return (
+    <form
+      className="ticket-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <input
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        placeholder="Betreff"
+        required
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Beschreibung"
+        rows={4}
+        required
+      />
+      <div className="ticket-form__meta">
+        <select value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="question">Frage</option>
+          <option value="bug">Fehler</option>
+          <option value="feature">Wunsch</option>
+          <option value="other">Sonstiges</option>
+        </select>
+        <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+          <option value="low">Niedrig</option>
+          <option value="normal">Normal</option>
+          <option value="high">Hoch</option>
+          <option value="urgent">Dringend</option>
+        </select>
+      </div>
+      <button type="submit" disabled={saving}>
+        Ticket erstellen
+      </button>
+    </form>
+  );
+}

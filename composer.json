@@ -3,7 +3,7 @@
   "description": "Support-ticket system extension (backend Module) for the TDS panel platform.",
   "type": "library",
   "license": "proprietary",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "require": {
     "php": ">=8.1",
     "slim/slim": "^4.13",
@@ -15,7 +15,10 @@
     "slim/psr7": "^1.6"
   },
   "repositories": [
-    { "type": "vcs", "url": "https://github.com/Tracht-Digital-Solutions/tds-panel-contract" }
+    {
+      "type": "vcs",
+      "url": "https://github.com/Tracht-Digital-Solutions/tds-panel-contract"
+    }
   ],
   "autoload": {
     "psr-4": {

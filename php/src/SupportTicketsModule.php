@@ -221,12 +221,59 @@ final class SupportTicketsModule extends AbstractModule
             return self::json($res, ['ok' => true]);
         });
 
-        // Status registry (read; CRUD lands in the next checkpoint).
+        // Status registry (admin CRUD).
         $app->get('/admin/ticket-statuses', function (Request $req, Response $res) use ($c): Response {
             if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
                 return $deny;
             }
             return self::json($res, ['statuses' => $c->get(TicketRepository::class)->statuses()]);
+        });
+
+        $app->post('/admin/ticket-statuses', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            $data = self::statusPayload((array) $req->getParsedBody());
+            if (is_string($data)) {
+                return self::json($res, ['error' => $data], 422);
+            }
+            return self::json($res, ['id' => $c->get(TicketRepository::class)->createStatus($data)], 201);
+        });
+
+        $app->patch('/admin/ticket-statuses/{id:[0-9]+}', function (Request $req, Response $res, array $args) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            $repo = $c->get(TicketRepository::class);
+            $id = (int) $args['id'];
+            if (!$repo->statusExists($id)) {
+                return self::json($res, ['error' => 'Not found'], 404);
+            }
+            $data = self::statusPayload((array) $req->getParsedBody());
+            if (is_string($data)) {
+                return self::json($res, ['error' => $data], 422);
+            }
+            $repo->updateStatus($id, $data);
+            return self::json($res, ['ok' => true]);
+        });
+
+        $app->delete('/admin/ticket-statuses/{id:[0-9]+}', function (Request $req, Response $res, array $args) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            $repo = $c->get(TicketRepository::class);
+            $id = (int) $args['id'];
+            if (!$repo->statusExists($id)) {
+                return self::json($res, ['error' => 'Not found'], 404);
+            }
+            if ($repo->statusInUse($id)) {
+                return self::json($res, ['error' => 'Status wird von Tickets verwendet und kann nicht gelöscht werden.'], 409);
+            }
+            if ($repo->statusCount() <= 1) {
+                return self::json($res, ['error' => 'Mindestens ein Status muss bestehen bleiben.'], 409);
+            }
+            $repo->deleteStatus($id);
+            return self::json($res, ['ok' => true]);
         });
     }
 
@@ -253,6 +300,33 @@ final class SupportTicketsModule extends AbstractModule
             return self::json($res, ['error' => 'Forbidden'], 403);
         }
         return null;
+    }
+
+    /**
+     * Validate + normalise a ticket_status payload. Returns the clean data array
+     * or an error message string.
+     *
+     * @param array<string,mixed> $body
+     * @return array{name:string,color:string,sort_order:int,visible_to_customer:bool,is_terminal:bool,is_default:bool}|string
+     */
+    private static function statusPayload(array $body): array|string
+    {
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            return 'name is required';
+        }
+        $color = (string) ($body['color'] ?? 'neutral');
+        if (!in_array($color, TicketRepository::STATUS_COLORS, true)) {
+            return 'color must be one of: ' . implode(', ', TicketRepository::STATUS_COLORS);
+        }
+        return [
+            'name' => $name,
+            'color' => $color,
+            'sort_order' => (int) ($body['sort_order'] ?? 0),
+            'visible_to_customer' => (bool) ($body['visible_to_customer'] ?? true),
+            'is_terminal' => (bool) ($body['is_terminal'] ?? false),
+            'is_default' => (bool) ($body['is_default'] ?? false),
+        ];
     }
 
     /** @param string[] $allowed */

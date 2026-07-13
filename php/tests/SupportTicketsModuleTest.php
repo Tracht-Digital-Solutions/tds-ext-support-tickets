@@ -113,4 +113,44 @@ final class SupportTicketsModuleTest extends TestCase
         $res = $this->get($this->appWith(new FakeUser(perms: ['tickets:read'])), '/admin/tickets');
         self::assertSame(403, $res->getStatusCode());
     }
+
+    public function testStatusCreateRequiresAdmin(): void
+    {
+        $res = $this->post(
+            $this->appWith(new FakeUser(perms: ['tickets:write'])),
+            '/admin/ticket-statuses',
+            ['name' => 'Neu', 'color' => 'info'],
+        );
+        self::assertSame(403, $res->getStatusCode());
+    }
+
+    public function testStatusCreateRejectsInvalidColour(): void
+    {
+        $res = $this->post(
+            $this->appWith(new FakeUser(admin: true)),
+            '/admin/ticket-statuses',
+            ['name' => 'Neu', 'color' => 'chartreuse'],
+        );
+        self::assertSame(422, $res->getStatusCode());
+        self::assertStringContainsString('color must be one of', (string) $res->getBody());
+    }
+
+    public function testStatusCreateRejectsMissingName(): void
+    {
+        $res = $this->post(
+            $this->appWith(new FakeUser(admin: true)),
+            '/admin/ticket-statuses',
+            ['color' => 'info'],
+        );
+        self::assertSame(422, $res->getStatusCode());
+    }
+
+    /** @param array<string,mixed> $body */
+    private function post(\Slim\App $app, string $path, array $body): \Psr\Http\Message\ResponseInterface
+    {
+        $req = (new ServerRequestFactory())->createServerRequest('POST', $path)
+            ->withHeader('Content-Type', 'application/json')
+            ->withParsedBody($body);
+        return $app->handle($req);
+    }
 }

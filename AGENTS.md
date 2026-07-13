@@ -33,10 +33,14 @@ contract and the core services.
 
 ## Checkpoint status
 
-Checkpoint-1: schema + repository + customer/admin CRUD + comments + triage
-update + RBAC + widget + list UI. TODO (next checkpoints): status-registry CRUD,
-attachments, full board UI, richer notifications + customer directory, IMAP +
-contact-form ingest, contact-tickets split.
+- **CP1:** schema + repository + customer/admin CRUD + comments + triage update +
+  RBAC + widget.
+- **CP2:** status-registry CRUD (admin, single-default enforce + delete-guards:
+  409 when in use or last status) + the portal board UI (list + detail + comment
+  thread + new-ticket form).
+- **TODO (next):** attachments (ticket_attachment + signed download), richer
+  notifications + a customer directory (portal-customer emails), IMAP +
+  contact-form ingest, then the contact-tickets split.
 
 ## After a change
 

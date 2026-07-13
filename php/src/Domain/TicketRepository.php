@@ -15,6 +15,9 @@ use PDO;
  */
 final class TicketRepository
 {
+    /** Allowed chip tones for a status colour (design-system semantic palette). */
+    public const STATUS_COLORS = ['neutral', 'info', 'success', 'warning', 'danger'];
+
     public function __construct(private readonly PDO $pdo)
     {
     }
@@ -203,5 +206,66 @@ final class TicketRepository
     {
         $this->pdo->prepare('UPDATE ticket SET updated_at = NOW() WHERE id = :id')
             ->execute([':id' => $ticketId]);
+    }
+
+    // --- status registry CRUD (admin) -----------------------------------------
+
+    public function statusCount(): int
+    {
+        return (int) $this->pdo->query('SELECT COUNT(*) FROM ticket_status')->fetchColumn();
+    }
+
+    public function statusInUse(int $id): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM ticket WHERE status_id = :id LIMIT 1');
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public function statusExists(int $id): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM ticket_status WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** @param array{name:string,color:string,sort_order:int,visible_to_customer:bool,is_terminal:bool,is_default:bool} $d */
+    public function createStatus(array $d): int
+    {
+        if ($d['is_default']) {
+            $this->pdo->exec('UPDATE ticket_status SET is_default = 0');
+        }
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO ticket_status (name, color, sort_order, visible_to_customer, is_terminal, is_default)
+             VALUES (:name, :color, :sort, :vis, :term, :def)'
+        );
+        $stmt->execute([
+            ':name' => $d['name'], ':color' => $d['color'], ':sort' => $d['sort_order'],
+            ':vis' => $d['visible_to_customer'] ? 1 : 0, ':term' => $d['is_terminal'] ? 1 : 0,
+            ':def' => $d['is_default'] ? 1 : 0,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @param array{name:string,color:string,sort_order:int,visible_to_customer:bool,is_terminal:bool,is_default:bool} $d */
+    public function updateStatus(int $id, array $d): void
+    {
+        if ($d['is_default']) {
+            $this->pdo->exec('UPDATE ticket_status SET is_default = 0');
+        }
+        $stmt = $this->pdo->prepare(
+            'UPDATE ticket_status SET name = :name, color = :color, sort_order = :sort,
+                    visible_to_customer = :vis, is_terminal = :term, is_default = :def WHERE id = :id'
+        );
+        $stmt->execute([
+            ':id' => $id, ':name' => $d['name'], ':color' => $d['color'], ':sort' => $d['sort_order'],
+            ':vis' => $d['visible_to_customer'] ? 1 : 0, ':term' => $d['is_terminal'] ? 1 : 0,
+            ':def' => $d['is_default'] ? 1 : 0,
+        ]);
+    }
+
+    public function deleteStatus(int $id): void
+    {
+        $this->pdo->prepare('DELETE FROM ticket_status WHERE id = :id')->execute([':id' => $id]);
     }
 }
