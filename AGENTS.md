@@ -38,9 +38,16 @@ contract and the core services.
 - **CP2:** status-registry CRUD (admin, single-default enforce + delete-guards:
   409 when in use or last status) + the portal board UI (list + detail + comment
   thread + new-ticket form).
-- **TODO (next):** attachments (ticket_attachment + signed download), richer
-  notifications + a customer directory (portal-customer emails), IMAP +
-  contact-form ingest, then the contact-tickets split.
+- **CP3:** attachments — `ticket_attachment` table, `Support\AttachmentStorage`
+  (on-disk under `TICKET_UPLOAD_DIR`, MIME + 25 MB whitelist), customer + admin
+  upload/download routes (cookie-authenticated streaming download, not signed
+  URLs — the session cookie is sent on `<a download>`), attachments surfaced in
+  the board detail + an upload control.
+- **TODO (next):** richer notifications + a customer directory (portal-customer
+  emails), IMAP + contact-form ingest, then the contact-tickets split.
+
+Env (host-side): `TICKET_ADMIN_EMAIL` (notification recipient), `TICKET_UPLOAD_DIR`
+(attachment storage root; unset → uploads 503).
 
 ## After a change
 

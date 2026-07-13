@@ -6,8 +6,11 @@ namespace Tds\Ext\SupportTickets;
 use PDO;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Message\UploadedFileInterface;
 use Slim\App;
+use Slim\Psr7\Factory\StreamFactory;
 use Tds\Ext\SupportTickets\Domain\TicketRepository;
+use Tds\Ext\SupportTickets\Support\AttachmentStorage;
 use Tds\Panel\Contract\AbstractModule;
 use Tds\Panel\Contract\Mailer;
 use Tds\Panel\Contract\PermissionDef;
@@ -56,6 +59,7 @@ final class SupportTicketsModule extends AbstractModule
                 $c->get(Mailer::class),
                 (string) (getenv('TICKET_ADMIN_EMAIL') ?: ''),
             ));
+            $c->set(AttachmentStorage::class, static fn () => new AttachmentStorage());
         }
 
         // --- Customer (portal) routes ------------------------------------------
@@ -120,7 +124,35 @@ final class SupportTicketsModule extends AbstractModule
                 return self::json($res, ['error' => 'Not found'], 404);
             }
             $ticket['comments'] = $repo->comments((int) $ticket['id'], includeInternal: false);
+            $ticket['attachments'] = $repo->attachments((int) $ticket['id']);
             return self::json($res, $ticket);
+        });
+
+        $app->post('/tickets/{id:[0-9]+}/attachments', function (Request $req, Response $res, array $args) use ($c): Response {
+            $user = $c->get(UserContext::class);
+            if (($deny = self::require($user, 'tickets:write', $res)) !== null) {
+                return $deny;
+            }
+            $repo = $c->get(TicketRepository::class);
+            $id = (int) $args['id'];
+            $ticket = $repo->find($id);
+            if ($ticket === null || (int) $ticket['customer_id'] !== $user->activeCompanyId()) {
+                return self::json($res, ['error' => 'Not found'], 404);
+            }
+            return self::upload($req, $res, $repo, $c->get(AttachmentStorage::class), $id, (int) $user->activeCompanyId(), $user->isAdmin());
+        });
+
+        $app->get('/tickets/{id:[0-9]+}/attachments/{aid:[0-9]+}', function (Request $req, Response $res, array $args) use ($c): Response {
+            $user = $c->get(UserContext::class);
+            if (($deny = self::require($user, 'tickets:read', $res)) !== null) {
+                return $deny;
+            }
+            $repo = $c->get(TicketRepository::class);
+            $ticket = $repo->find((int) $args['id']);
+            if ($ticket === null || (int) $ticket['customer_id'] !== $user->activeCompanyId()) {
+                return self::json($res, ['error' => 'Not found'], 404);
+            }
+            return self::download($res, $repo, $c->get(AttachmentStorage::class), (int) $args['id'], (int) $args['aid']);
         });
 
         $app->post('/tickets/{id:[0-9]+}/comments', function (Request $req, Response $res, array $args) use ($c): Response {
@@ -162,7 +194,30 @@ final class SupportTicketsModule extends AbstractModule
                 return self::json($res, ['error' => 'Not found'], 404);
             }
             $ticket['comments'] = $repo->comments((int) $ticket['id'], includeInternal: true);
+            $ticket['attachments'] = $repo->attachments((int) $ticket['id']);
             return self::json($res, $ticket);
+        });
+
+        $app->post('/admin/tickets/{id:[0-9]+}/attachments', function (Request $req, Response $res, array $args) use ($c): Response {
+            $user = $c->get(UserContext::class);
+            if (($deny = self::requireAdmin($user, $res)) !== null) {
+                return $deny;
+            }
+            $repo = $c->get(TicketRepository::class);
+            $id = (int) $args['id'];
+            $ticket = $repo->find($id);
+            if ($ticket === null) {
+                return self::json($res, ['error' => 'Not found'], 404);
+            }
+            $scope = (int) ($ticket['customer_id'] ?? 0);
+            return self::upload($req, $res, $repo, $c->get(AttachmentStorage::class), $id, $scope, true);
+        });
+
+        $app->get('/admin/tickets/{id:[0-9]+}/attachments/{aid:[0-9]+}', function (Request $req, Response $res, array $args) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            return self::download($res, $c->get(TicketRepository::class), $c->get(AttachmentStorage::class), (int) $args['id'], (int) $args['aid']);
         });
 
         $app->post('/admin/tickets/{id:[0-9]+}/comments', function (Request $req, Response $res, array $args) use ($c): Response {
@@ -340,5 +395,65 @@ final class SupportTicketsModule extends AbstractModule
     {
         $res->getBody()->write(json_encode($data, JSON_THROW_ON_ERROR));
         return $res->withStatus($status)->withHeader('Content-Type', 'application/json');
+    }
+
+    /** Shared multipart upload: validates the "file" part, stores it, records metadata. */
+    private static function upload(
+        Request $req,
+        Response $res,
+        TicketRepository $repo,
+        AttachmentStorage $storage,
+        int $ticketId,
+        int $scope,
+        bool $isAdmin,
+    ): Response {
+        $file = $req->getUploadedFiles()['file'] ?? null;
+        if (!$file instanceof UploadedFileInterface || $file->getError() !== UPLOAD_ERR_OK) {
+            return self::json($res, ['error' => 'No valid file uploaded under "file"'], 400);
+        }
+        if ($file->getSize() === null || $file->getSize() > AttachmentStorage::MAX_BYTES) {
+            return self::json($res, ['error' => 'File exceeds the 25 MB limit'], 413);
+        }
+        $mime = $file->getClientMediaType() ?? 'application/octet-stream';
+        if (!in_array($mime, AttachmentStorage::ALLOWED_MIME, true)) {
+            return self::json($res, ['error' => 'Mime type not allowed', 'mime' => $mime], 415);
+        }
+        if (!$storage->available()) {
+            return self::json($res, ['error' => 'Attachment storage unavailable'], 503);
+        }
+        $meta = $storage->store($scope, $file);
+        $aid = $repo->addAttachment([
+            'ticket_id' => $ticketId,
+            'comment_id' => null,
+            'filename' => $meta['filename'],
+            'storage_path' => $meta['storage_path'],
+            'mime_type' => $meta['mime_type'],
+            'size_bytes' => $meta['size_bytes'],
+            'uploaded_by_type' => $isAdmin ? 'owner' : 'customer',
+        ]);
+        return self::json($res, ['id' => $aid, 'filename' => $meta['filename']], 201);
+    }
+
+    /** Shared authenticated download: streams the file (auth already checked by the caller). */
+    private static function download(
+        Response $res,
+        TicketRepository $repo,
+        AttachmentStorage $storage,
+        int $ticketId,
+        int $attachmentId,
+    ): Response {
+        $a = $repo->findAttachment($ticketId, $attachmentId);
+        if ($a === null) {
+            return self::json($res, ['error' => 'Not found'], 404);
+        }
+        $abs = $storage->absolutePath((string) $a['storage_path']);
+        if ($abs === null) {
+            return self::json($res, ['error' => 'File missing on disk'], 404);
+        }
+        return $res
+            ->withBody((new StreamFactory())->createStreamFromFile($abs))
+            ->withHeader('Content-Type', (string) $a['mime_type'])
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $a['filename'] . '"')
+            ->withHeader('Content-Length', (string) $a['size_bytes']);
     }
 }

@@ -16,10 +16,17 @@ interface Comment {
   created_at: string;
 }
 
+interface Attachment {
+  id: number;
+  filename: string;
+  size_bytes: number;
+}
+
 interface TicketDetail extends TicketRow {
   description: string;
   customer_action_note: string | null;
   comments: Comment[];
+  attachments: Attachment[];
 }
 
 const api = (path: string, init?: RequestInit) =>
@@ -129,6 +136,13 @@ function TicketDetailView({
     onReload();
   };
 
+  const upload = async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    await api(`/tickets/${ticket.id}/attachments`, { method: "POST", body: form });
+    onReload();
+  };
+
   return (
     <article className="ticket-detail">
       <button type="button" onClick={onBack}>
@@ -142,6 +156,18 @@ function TicketDetailView({
         </p>
       ) : null}
       <p className="ticket-detail__description">{ticket.description}</p>
+
+      {ticket.attachments.length > 0 ? (
+        <ul className="ticket-attachments">
+          {ticket.attachments.map((a) => (
+            <li key={a.id}>
+              <a href={`/tickets/${ticket.id}/attachments/${a.id}`} download>
+                {a.filename}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <ol className="ticket-thread">
         {ticket.comments.map((c) => (
@@ -164,6 +190,17 @@ function TicketDetailView({
         <button type="button" onClick={send} disabled={sending || reply.trim() === ""}>
           Senden
         </button>
+        <label className="ticket-reply__attach">
+          Datei anhängen
+          <input
+            type="file"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
       </div>
     </article>
   );

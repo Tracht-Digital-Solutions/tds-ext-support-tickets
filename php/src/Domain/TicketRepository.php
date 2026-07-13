@@ -268,4 +268,45 @@ final class TicketRepository
     {
         $this->pdo->prepare('DELETE FROM ticket_status WHERE id = :id')->execute([':id' => $id]);
     }
+
+    // --- attachments ----------------------------------------------------------
+
+    /** @param array{ticket_id:int,comment_id:?int,filename:string,storage_path:string,mime_type:string,size_bytes:int,uploaded_by_type:string} $a */
+    public function addAttachment(array $a): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO ticket_attachment (ticket_id, comment_id, filename, storage_path, mime_type, size_bytes, uploaded_by_type)
+             VALUES (:tid, :cid, :name, :path, :mime, :size, :by)'
+        );
+        $stmt->execute([
+            ':tid' => $a['ticket_id'], ':cid' => $a['comment_id'], ':name' => $a['filename'],
+            ':path' => $a['storage_path'], ':mime' => $a['mime_type'], ':size' => $a['size_bytes'],
+            ':by' => $a['uploaded_by_type'],
+        ]);
+        $this->touch($a['ticket_id']);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function attachments(int $ticketId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, filename, mime_type, size_bytes, uploaded_by_type, created_at
+             FROM ticket_attachment WHERE ticket_id = :tid ORDER BY created_at, id'
+        );
+        $stmt->execute([':tid' => $ticketId]);
+        return $stmt->fetchAll();
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findAttachment(int $ticketId, int $attachmentId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, ticket_id, filename, storage_path, mime_type, size_bytes
+             FROM ticket_attachment WHERE id = :aid AND ticket_id = :tid'
+        );
+        $stmt->execute([':aid' => $attachmentId, ':tid' => $ticketId]);
+        $row = $stmt->fetch();
+        return $row === false ? null : $row;
+    }
 }

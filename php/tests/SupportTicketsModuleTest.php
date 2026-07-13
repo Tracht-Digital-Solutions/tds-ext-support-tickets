@@ -145,6 +145,26 @@ final class SupportTicketsModuleTest extends TestCase
         self::assertSame(422, $res->getStatusCode());
     }
 
+    public function testAttachmentUploadRequiresWritePermission(): void
+    {
+        $res = $this->post(
+            $this->appWith(new FakeUser(perms: ['tickets:read'])),
+            '/tickets/1/attachments',
+            [],
+        );
+        self::assertSame(403, $res->getStatusCode());
+    }
+
+    public function testAdminAttachmentUploadRequiresAdmin(): void
+    {
+        $res = $this->post(
+            $this->appWith(new FakeUser(perms: ['tickets:write'])),
+            '/admin/tickets/1/attachments',
+            [],
+        );
+        self::assertSame(403, $res->getStatusCode());
+    }
+
     /** @param array<string,mixed> $body */
     private function post(\Slim\App $app, string $path, array $body): \Psr\Http\Message\ResponseInterface
     {
