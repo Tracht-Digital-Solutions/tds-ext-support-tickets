@@ -1,0 +1,11 @@
+---
+// "Offene Tickets" dashboard widget shell (server component). Renders the card
+// chrome + a hydrated island that fetches /tickets/summary. Rendered by the
+// Dashboard host via virtual:panel-widgets.
+import OpenTicketsCount from "../islands/WidgetBody.tsx";
+---
+
+<article class="widget widget--tickets">
+  <h3>Offene Tickets</h3>
+  <OpenTicketsCount client:load />
+</article>

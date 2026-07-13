@@ -1,0 +1,37 @@
+{
+  "name": "tracht-digital-solutions/tds-ext-support-tickets",
+  "description": "Support-ticket system extension (backend Module) for the TDS panel platform.",
+  "type": "library",
+  "license": "proprietary",
+  "version": "0.1.0",
+  "require": {
+    "php": ">=8.1",
+    "slim/slim": "^4.13",
+    "tracht-digital-solutions/tds-panel-contract": "^1.0.0"
+  },
+  "require-dev": {
+    "php-di/php-di": "^7.0",
+    "phpunit/phpunit": "^10.5",
+    "slim/psr7": "^1.6"
+  },
+  "repositories": [
+    { "type": "vcs", "url": "https://github.com/Tracht-Digital-Solutions/tds-panel-contract" }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Tds\\Ext\\SupportTickets\\": "php/src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tds\\Ext\\SupportTickets\\Tests\\": "php/tests/"
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "preferred-install": "dist"
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}

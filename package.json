@@ -1,0 +1,53 @@
+{
+  "name": "@tracht-digital-solutions/tds-ext-support-tickets",
+  "version": "0.1.0",
+  "description": "Support-ticket system extension for the TDS panel platform: customer + admin ticketing (manifest + PHP Module) via panel-contract, email through the core Mailer.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "files": [
+    "dist",
+    "pages",
+    "widgets",
+    "islands",
+    "php",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./pages/*": "./pages/*",
+    "./widgets/*": "./widgets/*",
+    "./islands/*": "./islands/*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@tracht-digital-solutions/tds-panel-contract": "^1.0.0"
+  },
+  "peerDependencies": {
+    "astro": ">=6",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "rimraf": "^6.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tracht-Digital-Solutions/tds-ext-support-tickets.git"
+  }
+}
