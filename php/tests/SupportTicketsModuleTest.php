@@ -165,6 +165,12 @@ final class SupportTicketsModuleTest extends TestCase
         self::assertSame(403, $res->getStatusCode());
     }
 
+    public function testTicketSettingsRequireAdmin(): void
+    {
+        $app = $this->appWith(new FakeUser(perms: ['tickets:write']));
+        self::assertSame(403, $this->get($app, '/admin/ticket-settings')->getStatusCode());
+    }
+
     /** @param array<string,mixed> $body */
     private function post(\Slim\App $app, string $path, array $body): \Psr\Http\Message\ResponseInterface
     {

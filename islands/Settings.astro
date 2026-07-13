@@ -1,9 +1,11 @@
 ---
 // Support-tickets settings section, rendered by the base Einstellungen host via
-// virtual:panel-settings. Checkpoint-1 placeholder; the status registry editor +
-// notification toggles + IMAP config land in later checkpoints.
+// virtual:panel-settings. Notification toggles (CP4); the status-registry editor
+// + IMAP config land in later checkpoints.
+import NotificationSettings from "./NotificationSettings.tsx";
 ---
 
 <div class="settings-section settings-section--tickets">
-  <p>Support-Ticket-Einstellungen (Status-Verwaltung &amp; Benachrichtigungen folgen).</p>
+  <h3>E-Mail-Benachrichtigungen</h3>
+  <NotificationSettings client:load />
 </div>

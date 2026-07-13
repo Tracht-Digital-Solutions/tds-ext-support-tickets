@@ -43,8 +43,13 @@ contract and the core services.
   upload/download routes (cookie-authenticated streaming download, not signed
   URLs — the session cookie is sent on `<a download>`), attachments surfaced in
   the board detail + an upload control.
-- **TODO (next):** richer notifications + a customer directory (portal-customer
-  emails), IMAP + contact-form ingest, then the contact-tickets split.
+- **CP4:** notification toggles — `ticket_setting` registry + `Domain\TicketSettings`,
+  admin `GET`/`PUT /admin/ticket-settings` + a toggle island in the settings slot.
+  Three gated events via `Notifier`: new ticket→admin, owner reply→customer, status
+  change→customer (all through the core Mailer; no-op when off/unconfigured/no recipient).
+- **TODO (next):** IMAP + contact-form ingest; a customer directory so portal-customer
+  emails have a recipient (today only contact/email tickets carry `from_email`); then
+  the contact-tickets split.
 
 Env (host-side): `TICKET_ADMIN_EMAIL` (notification recipient), `TICKET_UPLOAD_DIR`
 (attachment storage root; unset → uploads 503).

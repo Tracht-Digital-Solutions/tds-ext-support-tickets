@@ -10,6 +10,7 @@ use Psr\Http\Message\UploadedFileInterface;
 use Slim\App;
 use Slim\Psr7\Factory\StreamFactory;
 use Tds\Ext\SupportTickets\Domain\TicketRepository;
+use Tds\Ext\SupportTickets\Domain\TicketSettings;
 use Tds\Ext\SupportTickets\Support\AttachmentStorage;
 use Tds\Panel\Contract\AbstractModule;
 use Tds\Panel\Contract\Mailer;
@@ -55,8 +56,10 @@ final class SupportTicketsModule extends AbstractModule
         $c = $app->getContainer();
         if ($c !== null && !$c->has(TicketRepository::class)) {
             $c->set(TicketRepository::class, static fn ($c) => new TicketRepository($c->get(PDO::class)));
+            $c->set(TicketSettings::class, static fn ($c) => new TicketSettings($c->get(PDO::class)));
             $c->set(Notifier::class, static fn ($c) => new Notifier(
                 $c->get(Mailer::class),
+                $c->get(TicketSettings::class),
                 (string) (getenv('TICKET_ADMIN_EMAIL') ?: ''),
             ));
             $c->set(AttachmentStorage::class, static fn () => new AttachmentStorage());
@@ -109,7 +112,7 @@ final class SupportTicketsModule extends AbstractModule
                 self::enum($body['type'] ?? 'question', ['question', 'bug', 'feature', 'other'], 'question'),
                 self::enum($body['priority'] ?? 'normal', ['low', 'normal', 'high', 'urgent'], 'normal'),
             );
-            $c->get(Notifier::class)->newCustomerTicket($id, $subject);
+            $c->get(Notifier::class)->onNewTicket($id, $subject);
             return self::json($res, ['id' => $id], 201);
         });
 
@@ -172,7 +175,6 @@ final class SupportTicketsModule extends AbstractModule
             }
             $repo->addComment($id, 'customer', $user->userId(), $text, isInternal: false);
             $repo->clearCustomerAction($id);
-            $c->get(Notifier::class)->newCustomerComment($id, (string) $ticket['subject']);
             return self::json($res, ['ok' => true], 201);
         });
 
@@ -239,7 +241,7 @@ final class SupportTicketsModule extends AbstractModule
             $internal = (bool) ($body['is_internal'] ?? false);
             $repo->addComment($id, 'owner', $user->userId(), $text, $internal);
             if (!$internal) {
-                $c->get(Notifier::class)->newOwnerComment($id, (string) $ticket['subject'], $ticket['from_email'] ?? null);
+                $c->get(Notifier::class)->onOwnerReply($id, (string) $ticket['subject'], $ticket['from_email'] ?? null);
             }
             return self::json($res, ['ok' => true], 201);
         });
@@ -250,7 +252,8 @@ final class SupportTicketsModule extends AbstractModule
             }
             $repo = $c->get(TicketRepository::class);
             $id = (int) $args['id'];
-            if ($repo->find($id) === null) {
+            $ticket = $repo->find($id);
+            if ($ticket === null) {
                 return self::json($res, ['error' => 'Not found'], 404);
             }
             $body = (array) $req->getParsedBody();
@@ -273,7 +276,27 @@ final class SupportTicketsModule extends AbstractModule
                 $fields['customer_action_note'] = $body['customer_action_note'] === null ? null : (string) $body['customer_action_note'];
             }
             $repo->updateAdmin($id, $fields);
+            if (isset($fields['status_id']) && $fields['status_id'] !== (int) $ticket['status_id']) {
+                $c->get(Notifier::class)->onStatusChange($id, (string) $ticket['subject'], $ticket['from_email'] ?? null);
+            }
             return self::json($res, ['ok' => true]);
+        });
+
+        // Ticket settings (notification toggles) — admin.
+        $app->get('/admin/ticket-settings', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            return self::json($res, ['settings' => $c->get(TicketSettings::class)->all()]);
+        });
+
+        $app->put('/admin/ticket-settings', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            $body = (array) $req->getParsedBody();
+            $c->get(TicketSettings::class)->put($body);
+            return self::json($res, ['settings' => $c->get(TicketSettings::class)->all()]);
         });
 
         // Status registry (admin CRUD).
