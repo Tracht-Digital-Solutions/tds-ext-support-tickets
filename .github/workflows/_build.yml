@@ -106,6 +106,7 @@ jobs:
           git push --follow-tags origin HEAD:main
 
       - name: Prune old prerelease package versions (keep newest 5)
+        continue-on-error: true  # best-effort housekeeping; needs delete:packages
         if: ${{ inputs.publish_tag != 'none' }}
         uses: actions/delete-package-versions@v5
         with:
@@ -116,6 +117,7 @@ jobs:
           token: ${{ secrets.PACKAGE_TOKEN }}
 
       - name: Prune old stable package versions (keep newest 10)
+        continue-on-error: true  # best-effort housekeeping; needs delete:packages
         if: ${{ inputs.publish_tag == 'latest' }}
         uses: actions/delete-package-versions@v5
         with:
