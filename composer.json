@@ -3,11 +3,12 @@
   "description": "Support-ticket system extension (backend Module) for the TDS panel platform.",
   "type": "library",
   "license": "proprietary",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "require": {
     "php": ">=8.1",
     "slim/slim": "^4.13",
-    "tracht-digital-solutions/tds-panel-contract": "^1.0.0"
+    "tracht-digital-solutions/tds-panel-contract": "^1.0.0",
+    "webklex/php-imap": "^6.0"
   },
   "require-dev": {
     "php-di/php-di": "^7.0",

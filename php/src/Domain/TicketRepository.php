@@ -174,6 +174,74 @@ final class TicketRepository
         return (int) $this->pdo->lastInsertId();
     }
 
+    // --- email ingest (threading) ---------------------------------------------
+
+    /** True when a mail's Message-ID was already stored (dedupe re-delivery). */
+    public function emailMessageIdSeen(string $messageId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT EXISTS(
+                SELECT 1 FROM ticket WHERE email_message_id = :m
+                UNION SELECT 1 FROM ticket_comment WHERE email_message_id = :m2
+             )'
+        );
+        $stmt->execute([':m' => $messageId, ':m2' => $messageId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * Find a ticket the email sender owns (by from_email) to thread a reply onto:
+     * a `#<id>` subject marker on their ticket, else a References/In-Reply-To hit
+     * on a stored Message-ID (ticket or comment) whose ticket is theirs. Without a
+     * customer directory this only threads email/contact tickets that carry
+     * `from_email`; portal tickets can't be email-matched yet.
+     *
+     * @param list<string> $references
+     */
+    public function findEmailReplyTicket(?int $subjectTicketId, array $references, string $fromEmail): ?int
+    {
+        if ($subjectTicketId !== null) {
+            $stmt = $this->pdo->prepare('SELECT id FROM ticket WHERE id = :id AND from_email = :e LIMIT 1');
+            $stmt->execute([':id' => $subjectTicketId, ':e' => $fromEmail]);
+            $id = $stmt->fetchColumn();
+            if ($id !== false) {
+                return (int) $id;
+            }
+        }
+        foreach ($references as $ref) {
+            $stmt = $this->pdo->prepare(
+                'SELECT t.id FROM ticket t WHERE t.email_message_id = :m AND t.from_email = :e LIMIT 1'
+            );
+            $stmt->execute([':m' => $ref, ':e' => $fromEmail]);
+            $id = $stmt->fetchColumn();
+            if ($id !== false) {
+                return (int) $id;
+            }
+            $stmt = $this->pdo->prepare(
+                'SELECT t.id FROM ticket_comment cm JOIN ticket t ON t.id = cm.ticket_id
+                 WHERE cm.email_message_id = :m AND t.from_email = :e LIMIT 1'
+            );
+            $stmt->execute([':m' => $ref, ':e' => $fromEmail]);
+            $id = $stmt->fetchColumn();
+            if ($id !== false) {
+                return (int) $id;
+            }
+        }
+        return null;
+    }
+
+    /** Append an inbound-email reply as a customer comment carrying its Message-ID. */
+    public function addEmailComment(int $ticketId, string $body, string $messageId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO ticket_comment (ticket_id, author_type, author_user_id, body, is_internal, email_message_id)
+             VALUES (:tid, \'customer\', NULL, :body, 0, :mid)'
+        );
+        $stmt->execute([':tid' => $ticketId, ':body' => $body, ':mid' => $messageId]);
+        $this->touch($ticketId);
+        return (int) $this->pdo->lastInsertId();
+    }
+
     public function addComment(
         int $ticketId,
         string $authorType,

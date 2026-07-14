@@ -11,6 +11,7 @@ use Slim\App;
 use Slim\Psr7\Factory\StreamFactory;
 use Tds\Ext\SupportTickets\Domain\TicketRepository;
 use Tds\Ext\SupportTickets\Domain\TicketSettings;
+use Tds\Ext\SupportTickets\Service\ImapTicketIngest;
 use Tds\Ext\SupportTickets\Support\AttachmentStorage;
 use Tds\Panel\Contract\AbstractModule;
 use Tds\Panel\Contract\Mailer;
@@ -63,6 +64,16 @@ final class SupportTicketsModule extends AbstractModule
                 (string) (getenv('TICKET_ADMIN_EMAIL') ?: ''),
             ));
             $c->set(AttachmentStorage::class, static fn () => new AttachmentStorage());
+            $c->set(ImapTicketIngest::class, static fn ($c) => new ImapTicketIngest(
+                $c->get(TicketRepository::class),
+                $c->get(AttachmentStorage::class),
+                (string) (getenv('IMAP_HOST') ?: ''),
+                (string) (getenv('IMAP_PORT') ?: ''),
+                (string) (getenv('IMAP_USER') ?: ''),
+                (string) (getenv('IMAP_PASS') ?: ''),
+                (string) (getenv('IMAP_SECURITY') ?: 'ssl'),
+                (string) (getenv('IMAP_FOLDER') ?: 'INBOX'),
+            ));
         }
 
         // --- Customer (portal) routes ------------------------------------------
@@ -183,13 +194,8 @@ final class SupportTicketsModule extends AbstractModule
         // categorised type/source='contact' with a NULL customer_id + from_*
         // details. (IMAP ingest — POST /tickets/ingest — lands in CP5b.)
         $app->post('/tickets/contact', function (Request $req, Response $res) use ($c): Response {
-            $expected = (string) (getenv('INGEST_TOKEN') ?: '');
-            if ($expected === '') {
-                return self::json($res, ['error' => 'INGEST_TOKEN not configured'], 503);
-            }
-            $provided = (string) ($req->getQueryParams()['token'] ?? $req->getHeaderLine('X-Ingest-Token'));
-            if ($provided === '' || !hash_equals($expected, $provided)) {
-                return self::json($res, ['error' => 'Invalid ingest token'], 401);
+            if (($deny = self::checkIngestToken($req, $res)) !== null) {
+                return $deny;
             }
             $body = (array) $req->getParsedBody();
             $name = trim((string) ($body['name'] ?? ''));
@@ -206,6 +212,15 @@ final class SupportTicketsModule extends AbstractModule
             $id = $c->get(TicketRepository::class)->createContactTicket($name, $email, $company, $message);
             $c->get(Notifier::class)->onNewTicket($id, 'Kontaktanfrage von ' . $name);
             return self::json($res, ['id' => $id], 201);
+        });
+
+        // IMAP poll, driven by an external scheduler (no cron/CLI on the prod
+        // host). INGEST_TOKEN-gated; threads inbound replies onto owned tickets.
+        $app->post('/tickets/ingest', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::checkIngestToken($req, $res)) !== null) {
+                return $deny;
+            }
+            return self::json($res, $c->get(ImapTicketIngest::class)->poll());
         });
 
         // --- Admin routes ------------------------------------------------------
@@ -310,6 +325,21 @@ final class SupportTicketsModule extends AbstractModule
                 $c->get(Notifier::class)->onStatusChange($id, (string) $ticket['subject'], $ticket['from_email'] ?? null);
             }
             return self::json($res, ['ok' => true]);
+        });
+
+        // Manual "Jetzt abrufen" + IMAP connection test (admin).
+        $app->post('/admin/tickets/ingest', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            return self::json($res, $c->get(ImapTicketIngest::class)->poll());
+        });
+
+        $app->get('/admin/tickets/imap-test', function (Request $req, Response $res) use ($c): Response {
+            if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {
+                return $deny;
+            }
+            return self::json($res, $c->get(ImapTicketIngest::class)->testConnection());
         });
 
         // Ticket settings (notification toggles) — admin.
@@ -448,6 +478,23 @@ final class SupportTicketsModule extends AbstractModule
     {
         $res->getBody()->write(json_encode($data, JSON_THROW_ON_ERROR));
         return $res->withStatus($status)->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Verify the shared INGEST_TOKEN (server-to-server auth for the ingest
+     * endpoints). Returns an error response, or null when the token is valid.
+     */
+    private static function checkIngestToken(Request $req, Response $res): ?Response
+    {
+        $expected = (string) (getenv('INGEST_TOKEN') ?: '');
+        if ($expected === '') {
+            return self::json($res, ['error' => 'INGEST_TOKEN not configured'], 503);
+        }
+        $provided = (string) ($req->getQueryParams()['token'] ?? $req->getHeaderLine('X-Ingest-Token'));
+        if ($provided === '' || !hash_equals($expected, $provided)) {
+            return self::json($res, ['error' => 'Invalid ingest token'], 401);
+        }
+        return null;
     }
 
     /** Shared multipart upload: validates the "file" part, stores it, records metadata. */

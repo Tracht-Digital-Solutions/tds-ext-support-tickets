@@ -60,6 +60,35 @@ final class AttachmentStorage
         ];
     }
 
+    /**
+     * Store raw bytes (a decoded email MIME part), or null when the part is
+     * disallowed / oversize / unwritable — the IMAP ingester skips it rather
+     * than failing the whole message. Same layout + name sanitising as store().
+     *
+     * @return array{filename:string,storage_path:string,mime_type:string,size_bytes:int}|null
+     */
+    public function storeBytes(int $scope, string $filename, string $bytes, string $mime): ?array
+    {
+        $size = strlen($bytes);
+        if (!$this->available() || $size === 0 || $size > self::MAX_BYTES) {
+            return null;
+        }
+        if (!in_array($mime, self::ALLOWED_MIME, true)) {
+            return null;
+        }
+        $root = $this->rootDir();
+        $dir = $root . DIRECTORY_SEPARATOR . $scope . DIRECTORY_SEPARATOR . 'tickets';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0700, true);
+        }
+        $safeName = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'file';
+        $rel = $scope . '/tickets/' . bin2hex(random_bytes(8)) . '-' . $safeName;
+        if (file_put_contents($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel), $bytes) === false) {
+            return null;
+        }
+        return ['filename' => $safeName, 'storage_path' => $rel, 'mime_type' => $mime, 'size_bytes' => $size];
+    }
+
     /** Absolute path of a stored attachment, or null when it's missing on disk. */
     public function absolutePath(string $storagePath): ?string
     {

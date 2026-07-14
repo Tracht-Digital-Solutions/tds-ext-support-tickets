@@ -198,6 +198,19 @@ final class SupportTicketsModuleTest extends TestCase
         putenv('INGEST_TOKEN');
     }
 
+    public function testImapIngestRequiresToken(): void
+    {
+        putenv('INGEST_TOKEN');
+        $res = $this->post($this->appWith(new FakeUser(auth: false)), '/tickets/ingest', []);
+        self::assertSame(503, $res->getStatusCode());
+    }
+
+    public function testImapTestRequiresAdmin(): void
+    {
+        $app = $this->appWith(new FakeUser(perms: ['tickets:read']));
+        self::assertSame(403, $this->get($app, '/admin/tickets/imap-test')->getStatusCode());
+    }
+
     /** @param array<string,mixed> $body */
     private function post(\Slim\App $app, string $path, array $body): \Psr\Http\Message\ResponseInterface
     {

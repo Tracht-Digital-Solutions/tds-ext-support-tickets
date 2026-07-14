@@ -40,6 +40,8 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          # ext-zip is required by webklex/php-imap (the IMAP ingest transport).
+          extensions: zip, fileinfo, mbstring
           coverage: none
           tools: composer:v2
 

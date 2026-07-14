@@ -51,13 +51,21 @@ contract and the core services.
   `INGEST_TOKEN` via `?token=`/`X-Ingest-Token`, constant-time). tds-contact-api
   forwards each submission; creates a `type/source='contact'`, NULL-customer ticket
   with `from_*` details + a validated payload (name≥2, valid email, message≥20).
-- **TODO (next):** CP5b IMAP ingest (`POST /tickets/ingest` + webklex poller — sender
-  matching needs the customer directory); a customer directory for portal-customer
-  email recipients; then the contact-tickets split.
+- **CP5b:** IMAP ingest — `Service\ImapTicketIngest` (webklex/php-imap over sockets,
+  no ext-imap; needs **ext-zip** → enabled in the CI setup-php). `POST /tickets/ingest`
+  (INGEST_TOKEN, external scheduler) + admin `POST /admin/tickets/ingest` ("Jetzt
+  abrufen") + `GET /admin/tickets/imap-test`. Dedupe on Message-ID, thread replies onto
+  an owned ticket (`#<id>` subject / In-Reply-To/References match a stored Message-ID
+  whose ticket carries the sender's `from_email`). **Adaptation:** with no customer
+  directory it only threads `from_email`-bearing tickets; mail from an unknown sender is
+  skipped (opening new tickets for arbitrary senders needs the customer directory).
+  Pure parsing helpers are unit-tested (no mailbox); webklex loads only on connect().
+- **TODO (next):** a customer directory for portal-customer email recipients + to let
+  IMAP open new tickets safely; then the contact-tickets split.
 
-Env (host-side): `TICKET_ADMIN_EMAIL` (notification recipient), `TICKET_UPLOAD_DIR`
-(attachment storage root; unset → uploads 503), `INGEST_TOKEN` (contact/IMAP ingest
-secret; unset → ingest 503).
+Env (host-side): `TICKET_ADMIN_EMAIL`, `TICKET_UPLOAD_DIR` (unset → uploads 503),
+`INGEST_TOKEN` (unset → ingest 503), `IMAP_HOST`/`IMAP_PORT`/`IMAP_USER`/`IMAP_PASS`/
+`IMAP_SECURITY` (ssl|tls|none)/`IMAP_FOLDER` (unset host/user → poll no-ops).
 
 ## After a change
 
