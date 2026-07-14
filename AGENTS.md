@@ -60,8 +60,12 @@ contract and the core services.
   directory it only threads `from_email`-bearing tickets; mail from an unknown sender is
   skipped (opening new tickets for arbitrary senders needs the customer directory).
   Pure parsing helpers are unit-tested (no mailbox); webklex loads only on connect().
-- **TODO (next):** a customer directory for portal-customer email recipients + to let
-  IMAP open new tickets safely; then the contact-tickets split.
+- **CP6:** portal-customer notification recipient — a portal ticket now stores the
+  creator's `UserContext::email()` (contract 1.2.0) in `from_email`, so owner-reply +
+  status-change emails reach portal customers (previously only contact/email tickets had
+  a recipient).
+- **TODO (next):** a customer directory so IMAP can open NEW tickets for unknown senders
+  safely (threading already works); then the contact-tickets split.
 
 Env (host-side): `TICKET_ADMIN_EMAIL`, `TICKET_UPLOAD_DIR` (unset → uploads 503),
 `INGEST_TOKEN` (unset → ingest 503), `IMAP_HOST`/`IMAP_PORT`/`IMAP_USER`/`IMAP_PASS`/

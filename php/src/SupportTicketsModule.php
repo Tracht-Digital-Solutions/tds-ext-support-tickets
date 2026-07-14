@@ -122,6 +122,7 @@ final class SupportTicketsModule extends AbstractModule
                 $description,
                 self::enum($body['type'] ?? 'question', ['question', 'bug', 'feature', 'other'], 'question'),
                 self::enum($body['priority'] ?? 'normal', ['low', 'normal', 'high', 'urgent'], 'normal'),
+                $user->email(),
             );
             $c->get(Notifier::class)->onNewTicket($id, $subject);
             return self::json($res, ['id' => $id], 201);

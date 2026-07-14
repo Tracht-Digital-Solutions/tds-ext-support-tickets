@@ -33,6 +33,11 @@ final class FakeUser implements UserContext
         return $this->uid;
     }
 
+    public function email(): ?string
+    {
+        return null;
+    }
+
     public function isAdmin(): bool
     {
         return $this->admin;

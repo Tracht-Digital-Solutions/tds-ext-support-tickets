@@ -132,11 +132,14 @@ final class TicketRepository
         string $description,
         string $type,
         string $priority,
+        ?string $email = null,
     ): int {
+        // from_email carries the creator's address so owner-reply / status-change
+        // notifications can reach a portal customer (there's no customer directory).
         $stmt = $this->pdo->prepare(
             'INSERT INTO ticket (customer_id, status_id, subject, description, priority, type,
-                                 created_by_type, created_by_user_id, source)
-             VALUES (:cid, :sid, :subject, :description, :priority, :type, \'customer\', :uid, \'portal\')'
+                                 created_by_type, created_by_user_id, source, from_email)
+             VALUES (:cid, :sid, :subject, :description, :priority, :type, \'customer\', :uid, \'portal\', :email)'
         );
         $stmt->execute([
             ':cid' => $customerId,
@@ -146,6 +149,7 @@ final class TicketRepository
             ':priority' => $priority,
             ':type' => $type,
             ':uid' => $userId,
+            ':email' => $email,
         ]);
         return (int) $this->pdo->lastInsertId();
     }
