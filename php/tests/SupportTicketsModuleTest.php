@@ -171,6 +171,33 @@ final class SupportTicketsModuleTest extends TestCase
         self::assertSame(403, $this->get($app, '/admin/ticket-settings')->getStatusCode());
     }
 
+    public function testContactIngestRequiresConfiguredToken(): void
+    {
+        putenv('INGEST_TOKEN');
+        $res = $this->post($this->appWith(new FakeUser(auth: false)), '/tickets/contact', []);
+        self::assertSame(503, $res->getStatusCode());
+    }
+
+    public function testContactIngestRejectsBadToken(): void
+    {
+        putenv('INGEST_TOKEN=secret');
+        $res = $this->post($this->appWith(new FakeUser(auth: false)), '/tickets/contact?token=wrong', []);
+        self::assertSame(401, $res->getStatusCode());
+        putenv('INGEST_TOKEN');
+    }
+
+    public function testContactIngestValidatesPayload(): void
+    {
+        putenv('INGEST_TOKEN=secret');
+        $res = $this->post(
+            $this->appWith(new FakeUser(auth: false)),
+            '/tickets/contact?token=secret',
+            ['name' => 'A', 'email' => 'not-an-email', 'message' => 'short'],
+        );
+        self::assertSame(422, $res->getStatusCode());
+        putenv('INGEST_TOKEN');
+    }
+
     /** @param array<string,mixed> $body */
     private function post(\Slim\App $app, string $path, array $body): \Psr\Http\Message\ResponseInterface
     {

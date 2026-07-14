@@ -47,12 +47,17 @@ contract and the core services.
   admin `GET`/`PUT /admin/ticket-settings` + a toggle island in the settings slot.
   Three gated events via `Notifier`: new ticket→admin, owner reply→customer, status
   change→customer (all through the core Mailer; no-op when off/unconfigured/no recipient).
-- **TODO (next):** IMAP + contact-form ingest; a customer directory so portal-customer
-  emails have a recipient (today only contact/email tickets carry `from_email`); then
-  the contact-tickets split.
+- **CP5a:** contact-form ingest — `POST /tickets/contact` (server-to-server,
+  `INGEST_TOKEN` via `?token=`/`X-Ingest-Token`, constant-time). tds-contact-api
+  forwards each submission; creates a `type/source='contact'`, NULL-customer ticket
+  with `from_*` details + a validated payload (name≥2, valid email, message≥20).
+- **TODO (next):** CP5b IMAP ingest (`POST /tickets/ingest` + webklex poller — sender
+  matching needs the customer directory); a customer directory for portal-customer
+  email recipients; then the contact-tickets split.
 
 Env (host-side): `TICKET_ADMIN_EMAIL` (notification recipient), `TICKET_UPLOAD_DIR`
-(attachment storage root; unset → uploads 503).
+(attachment storage root; unset → uploads 503), `INGEST_TOKEN` (contact/IMAP ingest
+secret; unset → ingest 503).
 
 ## After a change
 

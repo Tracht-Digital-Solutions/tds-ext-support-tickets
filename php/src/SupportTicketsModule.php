@@ -178,6 +178,36 @@ final class SupportTicketsModule extends AbstractModule
             return self::json($res, ['ok' => true], 201);
         });
 
+        // --- Ingest (server-to-server, INGEST_TOKEN — not a browser session) ---
+        // Contact-form submissions forwarded by tds-contact-api become tickets
+        // categorised type/source='contact' with a NULL customer_id + from_*
+        // details. (IMAP ingest — POST /tickets/ingest — lands in CP5b.)
+        $app->post('/tickets/contact', function (Request $req, Response $res) use ($c): Response {
+            $expected = (string) (getenv('INGEST_TOKEN') ?: '');
+            if ($expected === '') {
+                return self::json($res, ['error' => 'INGEST_TOKEN not configured'], 503);
+            }
+            $provided = (string) ($req->getQueryParams()['token'] ?? $req->getHeaderLine('X-Ingest-Token'));
+            if ($provided === '' || !hash_equals($expected, $provided)) {
+                return self::json($res, ['error' => 'Invalid ingest token'], 401);
+            }
+            $body = (array) $req->getParsedBody();
+            $name = trim((string) ($body['name'] ?? ''));
+            $email = strtolower(trim((string) ($body['email'] ?? '')));
+            $message = trim((string) ($body['message'] ?? ''));
+            $companyRaw = trim((string) ($body['company'] ?? ''));
+            $company = $companyRaw === '' ? null : mb_substr($companyRaw, 0, 200);
+            if (mb_strlen($name) < 2
+                || filter_var($email, FILTER_VALIDATE_EMAIL) === false
+                || mb_strlen($message) < 20
+            ) {
+                return self::json($res, ['error' => 'Invalid contact payload'], 422);
+            }
+            $id = $c->get(TicketRepository::class)->createContactTicket($name, $email, $company, $message);
+            $c->get(Notifier::class)->onNewTicket($id, 'Kontaktanfrage von ' . $name);
+            return self::json($res, ['id' => $id], 201);
+        });
+
         // --- Admin routes ------------------------------------------------------
         $app->get('/admin/tickets', function (Request $req, Response $res) use ($c): Response {
             if (($deny = self::requireAdmin($c->get(UserContext::class), $res)) !== null) {

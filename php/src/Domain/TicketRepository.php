@@ -150,6 +150,30 @@ final class TicketRepository
         return (int) $this->pdo->lastInsertId();
     }
 
+    /**
+     * Open a ticket from a contact-form submission. customer_id stays NULL (the
+     * submitter is usually not a customer; a customer directory could bind it
+     * later), details live in from_*, categorised type/source=contact.
+     */
+    public function createContactTicket(string $name, string $email, ?string $company, string $message): int
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO ticket (customer_id, status_id, subject, description, priority, type,
+                                 created_by_type, source, from_name, from_email, from_company)
+             VALUES (NULL, :sid, :subject, :description, \'normal\', \'contact\', \'customer\', \'contact\',
+                     :name, :email, :company)'
+        );
+        $stmt->execute([
+            ':sid' => $this->defaultStatusId(),
+            ':subject' => mb_substr('Kontaktanfrage von ' . $name, 0, 200),
+            ':description' => mb_substr($message, 0, 10000),
+            ':name' => $name,
+            ':email' => $email,
+            ':company' => $company,
+        ]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
     public function addComment(
         int $ticketId,
         string $authorType,
