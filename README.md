@@ -1,4 +1,4 @@
-# tds-ext-support-tickets
+# tds-ext-support-tickets-pkg
 
 The **support-ticket system** as a panel extension, ported from
 `tds-customer-api`. Customers open + follow tickets in the portal; admins triage
