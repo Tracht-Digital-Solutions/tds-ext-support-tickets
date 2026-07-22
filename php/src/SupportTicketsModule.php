@@ -13,10 +13,10 @@ use Tds\Ext\SupportTickets\Domain\TicketRepository;
 use Tds\Ext\SupportTickets\Domain\TicketSettings;
 use Tds\Ext\SupportTickets\Service\ImapTicketIngest;
 use Tds\Ext\SupportTickets\Support\AttachmentStorage;
-use Tds\Panel\Contract\AbstractModule;
-use Tds\Panel\Contract\Mailer;
-use Tds\Panel\Contract\PermissionDef;
-use Tds\Panel\Contract\UserContext;
+use Tds\Frontend\Contract\AbstractModule;
+use Tds\Frontend\Contract\Mailer;
+use Tds\Frontend\Contract\PermissionDef;
+use Tds\Frontend\Contract\UserContext;
 
 /**
  * Backend Module for the support-ticket system (checkpoint-1 surface: customer

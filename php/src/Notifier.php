@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Tds\Ext\SupportTickets;
 
 use Tds\Ext\SupportTickets\Domain\TicketSettings;
-use Tds\Panel\Contract\Email;
-use Tds\Panel\Contract\Mailer;
+use Tds\Frontend\Contract\Email;
+use Tds\Frontend\Contract\Mailer;
 
 /**
  * Ticket notifications through the CORE {@see Mailer}, each gated by an admin

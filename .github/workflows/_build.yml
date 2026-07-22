@@ -7,7 +7,7 @@ name: Build (reusable)
 # tag pushed here. Both test suites gate every run.
 #
 # NB NPM_TOKEN is set from PACKAGE_TOKEN (needs read:packages) so `npm install`
-# can pull @tracht-digital-solutions/tds-panel-contract from GitHub Packages via
+# can pull @tracht-digital-solutions/tds-frontend-contract from GitHub Packages via
 # the committed .npmrc; the same token (write+delete:packages) publishes.
 
 on:
@@ -49,7 +49,7 @@ jobs:
         run: composer validate --no-check-publish --no-check-lock
 
       - name: Composer install
-        # Resolves tds-panel-contract from its public VCS repo (the local path
+        # Resolves tds-frontend-contract from its public VCS repo (the local path
         # repo in composer.json is a dev convenience and is absent in CI).
         uses: ramsey/composer-install@v3
 

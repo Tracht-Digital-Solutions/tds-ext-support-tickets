@@ -1,8 +1,8 @@
 # tds-ext-support-tickets-pkg
 
-The **support-ticket system** as a panel extension, ported from
+The **support-ticket system** as a frontend extension, ported from
 `tds-customer-api`. Customers open + follow tickets in the portal; admins triage
-them. Built on the panel platform's core services:
+them. Built on the frontend platform's core services:
 
 - **Auth** — RBAC (`tickets:read`/`tickets:write`) + company scoping from the
   core `UserContext` (the extension never verifies tokens).
@@ -33,14 +33,14 @@ ingest** channels.
 ## Develop
 
 ```bash
-npm install        # pulls tds-panel-contract from GitHub Packages (needs NPM_TOKEN)
+npm install        # pulls tds-frontend-contract from GitHub Packages (needs NPM_TOKEN)
 npm run build && npm run type-check
-composer install   # resolves tds-panel-contract from its public VCS repo
+composer install   # resolves tds-frontend-contract from its public VCS repo
 composer test      # phpunit — route/RBAC coverage; DB-backed tests skip without TDS_TEST_DB_DSN
 ```
 
 ## Enable it
 
-Host `astro.config.mjs`: add the manifest to `panelHost({ extensions: [...] })`.
+Host `astro.config.mjs`: add the manifest to `frontendHost({ extensions: [...] })`.
 Base API: add `new SupportTicketsModule()` to `Modules::enabled()`. Set
 `TICKET_ADMIN_EMAIL` (+ the core `MAIL_DSN`) for admin notifications.

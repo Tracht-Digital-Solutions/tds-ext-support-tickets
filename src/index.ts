@@ -1,4 +1,4 @@
-import { defineExtension } from "@tracht-digital-solutions/tds-panel-contract";
+import { defineExtension } from "@tracht-digital-solutions/tds-frontend-contract";
 
 /**
  * Support-tickets extension — the customer↔owner support system, ported from

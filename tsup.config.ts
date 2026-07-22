@@ -9,5 +9,5 @@ export default defineConfig({
   clean: true,
   // The manifest resolves defineExtension from the contract at the host; the
   // .astro/.tsx pages + islands are consumed as raw source (see exports).
-  external: ["@tracht-digital-solutions/tds-panel-contract"],
+  external: ["@tracht-digital-solutions/tds-frontend-contract"],
 });

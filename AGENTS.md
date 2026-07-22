@@ -1,7 +1,7 @@
 # AGENTS.md — tds-ext-support-tickets-pkg
 
 Support-ticket extension, ported from `tds-customer-api`. Read
-`tds-panel-contract-pkg` + `tds-core-panel-api` AGENTS first — this consumes the
+`tds-frontend-contract-pkg` + `tds-core-frontend-api` AGENTS first — this consumes the
 contract and the core services.
 
 ## Model / deviations from customer-api
