@@ -23,8 +23,11 @@ contract and the core services.
 
 ## Gotchas
 
-- Migration class names are **module-prefixed** (`SupportTickets*`) — the
-  in-process auto-migrator loads all modules' migrations into one process.
+- Migration class names are **module-prefixed** (`SupportTickets*`) AND the
+  numeric **version prefixes are globally unique** (this module owns the
+  `20260725*` band) — the in-process auto-migrator loads every composed module's
+  migrations into one shared `phinxlog`, so a reused class name OR version
+  collides. Keep new migrations in this band.
 - Routes are closures resolving `UserContext`/`TicketRepository`/`Notifier` from
   the container **at request time** (UserContext is rebound per request by the
   core AuthMiddleware). Don't capture UserContext at register time.
